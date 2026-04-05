@@ -3,39 +3,441 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORACLE — Working Version</title>
+<title>ORACLE — Deep Research Filter</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-body{font-family:Arial;padding:40px;background:#f5f0e8}
-input{padding:10px;width:300px}
-button{padding:10px}
-.result{margin-top:20px;padding:10px;background:white;border:1px solid #ccc}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #0f0e0d; --paper: #f5f0e8; --paper-dark: #ede7d9;
+    --accent: #c0392b; --accent2: #1a3a5c; --muted: #7a7060; --rule: #c8bfa8;
+    --green: #27ae60;
+  }
+  body { background: var(--paper); color: var(--ink); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh; }
+
+  /* MASTHEAD */
+  .masthead { border-bottom: 3px double var(--ink); padding: 24px 48px 18px; display: flex; align-items: flex-end; justify-content: space-between; position: relative; }
+  .masthead::after { content:''; position:absolute; bottom:5px; left:48px; right:48px; height:1px; background:var(--ink); }
+  .masthead-title { font-family:'Playfair Display',serif; font-size:3rem; font-weight:700; letter-spacing:-1px; line-height:1; }
+  .masthead-title span { color:var(--accent); }
+  .masthead-sub { font-family:'IBM Plex Mono',monospace; font-size:0.6rem; color:var(--muted); text-align:right; line-height:1.7; text-transform:uppercase; letter-spacing:0.05em; }
+
+  /* CATEGORY BAR */
+  .category-bar { border-bottom:1px solid var(--rule); padding:10px 48px; display:flex; gap:6px; flex-wrap:wrap; background:var(--paper-dark); }
+  .cat-pill { font-family:'IBM Plex Mono',monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; padding:4px 12px; border:1px solid var(--rule); border-radius:2px; cursor:pointer; background:transparent; color:var(--muted); transition:all 0.15s; }
+  .cat-pill:hover, .cat-pill.active { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
+  /* SEARCH */
+  .search-section { padding:28px 48px 20px; border-bottom:1px solid var(--rule); }
+  .search-label { font-family:'IBM Plex Mono',monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); margin-bottom:10px; }
+  .search-row { display:flex; max-width:900px; }
+  .search-input { flex:1; font-family:'Playfair Display',serif; font-size:1.25rem; font-style:italic; padding:13px 20px; border:2px solid var(--ink); border-right:none; background:white; color:var(--ink); outline:none; }
+  .search-input::placeholder { color:var(--rule); }
+  .search-btn { font-family:'IBM Plex Mono',monospace; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.1em; padding:13px 28px; background:var(--ink); color:var(--paper); border:2px solid var(--ink); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+  .search-btn:hover { background:var(--accent); border-color:var(--accent); }
+  .search-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+  /* FILTERS */
+  .filter-row { display:flex; gap:14px; margin-top:12px; flex-wrap:wrap; align-items:center; }
+  .filter-toggle { display:flex; align-items:center; gap:6px; font-family:'IBM Plex Mono',monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); cursor:pointer; user-select:none; }
+  .filter-toggle input { display:none; }
+  .toggle-box { width:13px; height:13px; border:1.5px solid var(--rule); display:flex; align-items:center; justify-content:center; transition:all 0.15s; flex-shrink:0; }
+  .filter-toggle input:checked + .toggle-box { background:var(--accent2); border-color:var(--accent2); }
+  .toggle-box::after { content:'✓'; font-size:8px; color:white; display:none; }
+  .filter-toggle input:checked + .toggle-box::after { display:block; }
+  .filter-divider { width:1px; height:14px; background:var(--rule); }
+
+  /* MAIN */
+  .main { padding:28px 48px; max-width:1100px; }
+
+  /* STATUS */
+  .status-bar { font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:20px; padding-bottom:12px; border-bottom:1px solid var(--rule); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .status-dot { width:7px; height:7px; border-radius:50%; background:var(--rule); display:inline-block; flex-shrink:0; }
+  .status-dot.live { background:var(--green); }
+  .status-dot.searching { background:var(--accent); animation:pulse 0.7s infinite; }
+  .status-dot.error { background:var(--accent); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* PROGRESS STEPS */
+  .progress-steps { display:none; gap:0; flex-direction:column; margin-bottom:24px; }
+  .progress-steps.visible { display:flex; }
+  .step { font-family:'IBM Plex Mono',monospace; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.08em; padding:7px 0; border-bottom:1px solid var(--rule); display:flex; align-items:center; gap:10px; color:var(--rule); transition:color 0.3s; }
+  .step.done { color:var(--green); }
+  .step.active { color:var(--ink); animation:blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .step-icon { font-size:0.75rem; width:16px; text-align:center; }
+
+  /* RESEARCH BRIEF */
+  .research-brief { background:white; border:1.5px solid var(--ink); padding:28px 32px; margin-bottom:32px; position:relative; animation:fadeUp 0.4s ease both; }
+  .brief-label { font-family:'IBM Plex Mono',monospace; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.15em; color:var(--accent); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .brief-label::after { content:''; flex:1; height:1px; background:var(--rule); }
+  .brief-title { font-family:'Playfair Display',serif; font-size:1.5rem; font-weight:700; margin-bottom:14px; line-height:1.2; }
+  .brief-body { font-size:0.9rem; line-height:1.75; color:#2a2520; font-weight:300; }
+  .brief-body p { margin-bottom:10px; }
+  .brief-body p:last-child { margin-bottom:0; }
+  .brief-keypoints { margin-top:18px; display:flex; flex-direction:column; gap:8px; }
+  .keypoint { display:flex; gap:10px; align-items:flex-start; font-size:0.85rem; line-height:1.5; color:#2a2520; }
+  .keypoint-bullet { font-family:'IBM Plex Mono',monospace; font-size:0.65rem; color:var(--accent); font-weight:500; margin-top:2px; flex-shrink:0; }
+
+  /* SOURCES HEADER */
+  .sources-header { font-family:'IBM Plex Mono',monospace; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--rule); display:flex; align-items:center; justify-content:space-between; }
+
+  /* RESULT CARDS */
+  .results-grid { display:flex; flex-direction:column; }
+  .result-card { border-bottom:1px solid var(--rule); padding:20px 0; display:grid; grid-template-columns:48px 1fr; gap:0 18px; animation:fadeUp 0.3s ease both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .result-number { font-family:'Playfair Display',serif; font-size:2.1rem; font-weight:700; color:var(--rule); line-height:1; padding-top:2px; text-align:right; padding-right:14px; border-right:1px solid var(--rule); }
+  .result-body { padding-left:4px; }
+  .result-meta { display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap; }
+  .result-source { font-family:'IBM Plex Mono',monospace; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--accent2); font-weight:500; }
+  .result-type { font-family:'IBM Plex Mono',monospace; font-size:0.58rem; padding:2px 6px; border:1px solid currentColor; border-radius:2px; text-transform:uppercase; letter-spacing:0.06em; }
+  .type-academic{color:#8b4513} .type-news{color:var(--accent2)} .type-encyclopedia{color:#2c7a4b}
+  .type-longform{color:#6b3fa0} .type-community{color:#c0720a} .type-forum{color:#b8860b} .type-general{color:var(--muted)}
+  .result-title { font-family:'Playfair Display',serif; font-size:1.05rem; font-weight:700; line-height:1.3; margin-bottom:7px; }
+  .result-title a { color:var(--ink); text-decoration:none; border-bottom:1px solid transparent; transition:border-color 0.15s; }
+  .result-title a:hover { border-bottom-color:var(--accent); }
+  .result-summary { font-size:0.85rem; line-height:1.65; color:#3a3530; font-weight:300; max-width:700px; }
+  .result-insight { margin-top:8px; font-size:0.82rem; line-height:1.6; color:#1a3a5c; font-style:italic; border-left:2px solid var(--accent2); padding-left:10px; max-width:700px; display:none; }
+  .result-insight.visible { display:block; }
+  .result-quality { margin-top:8px; display:flex; align-items:center; gap:6px; }
+  .quality-bar { height:3px; width:50px; background:var(--rule); border-radius:2px; overflow:hidden; }
+  .quality-fill { height:100%; border-radius:2px; background:var(--accent2); }
+  .quality-label { font-family:'IBM Plex Mono',monospace; font-size:0.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; }
+
+  /* EMPTY / DEBUG */
+  .empty-state { padding:56px 0; text-align:center; }
+  .empty-state-title { font-family:'Playfair Display',serif; font-size:1.4rem; font-style:italic; color:var(--muted); margin-bottom:8px; }
+  .empty-state-sub { font-family:'IBM Plex Mono',monospace; font-size:0.62rem; color:var(--rule); text-transform:uppercase; letter-spacing:0.1em; }
+  .debug-box { background:#fff8f0; border:1px solid var(--rule); border-radius:3px; padding:12px 16px; margin-bottom:20px; font-family:'IBM Plex Mono',monospace; font-size:0.62rem; color:#555; line-height:1.6; word-break:break-all; display:none; }
+  .debug-box.visible { display:block; }
+
+  @media(max-width:640px){
+    .masthead,.category-bar,.search-section,.main{padding-left:18px;padding-right:18px}
+    .masthead{flex-direction:column;align-items:flex-start;gap:8px}
+    .masthead-title{font-size:2.2rem}
+    .result-card{grid-template-columns:1fr}
+    .result-number{display:none}
+    .research-brief{padding:18px}
+  }
 </style>
 </head>
 <body>
-<h1>ORACLE (Working)</h1>
-<input id="q" placeholder="Search topic...">
-<button onclick="search()">Search</button>
-<div id="out"></div>
+
+<header class="masthead">
+  <div class="masthead-title"><span>O</span>RACLE</div>
+  <div class="masthead-sub">Deep Research Filter<br>People · Geopolitics · History · Ideas · Forums</div>
+</header>
+
+<div class="category-bar">
+  <button class="cat-pill active" data-cat="all">All Topics</button>
+  <button class="cat-pill" data-cat="people">People</button>
+  <button class="cat-pill" data-cat="geopolitics">Geopolitics</button>
+  <button class="cat-pill" data-cat="history">History</button>
+  <button class="cat-pill" data-cat="science">Science</button>
+  <button class="cat-pill" data-cat="philosophy">Philosophy</button>
+  <button class="cat-pill" data-cat="interesting">Interesting Ideas</button>
+</div>
+
+<div class="search-section">
+  <div class="search-label">Search any topic, person, event, or question</div>
+  <div class="search-row">
+    <input class="search-input" id="searchInput" type="text" placeholder="e.g. Henry Kissinger, fall of Rome, India China border tensions…" />
+    <button class="search-btn" id="searchBtn" onclick="doSearch()">Search</button>
+  </div>
+  <div class="filter-row">
+    <label class="filter-toggle"><input type="checkbox" id="fAcademic" checked><span class="toggle-box"></span>Academic</label>
+    <label class="filter-toggle"><input type="checkbox" id="fNews" checked><span class="toggle-box"></span>Quality News</label>
+    <label class="filter-toggle"><input type="checkbox" id="fEncyclopedia" checked><span class="toggle-box"></span>Encyclopedia</label>
+    <label class="filter-toggle"><input type="checkbox" id="fLongform" checked><span class="toggle-box"></span>Long-form</label>
+    <div class="filter-divider"></div>
+    <label class="filter-toggle"><input type="checkbox" id="fReddit" checked><span class="toggle-box"></span>Reddit</label>
+    <label class="filter-toggle"><input type="checkbox" id="fQuora" checked><span class="toggle-box"></span>Quora</label>
+    <label class="filter-toggle"><input type="checkbox" id="fSubstack" checked><span class="toggle-box"></span>Substack</label>
+    <label class="filter-toggle"><input type="checkbox" id="fForums"><span class="toggle-box"></span>4chan / Other Forums</label>
+  </div>
+</div>
+
+<div class="main">
+  <div class="status-bar">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Ready — enter a topic above to begin deep research</span>
+  </div>
+
+  <div class="progress-steps" id="progressSteps">
+    <div class="step" id="step1"><span class="step-icon">◎</span> Step 1 — Searching the web for sources</div>
+    <div class="step" id="step2"><span class="step-icon">◎</span> Step 2 — Targeting forums and community discussions</div>
+    <div class="step" id="step3"><span class="step-icon">◎</span> Step 3 — Extracting deep insights from top sources</div>
+    <div class="step" id="step4"><span class="step-icon">◎</span> Step 4 — Compiling research brief</div>
+    <div class="step" id="step5"><span class="step-icon">◎</span> Step 5 — Ranking and filtering results</div>
+  </div>
+
+  <div class="debug-box" id="debugBox"></div>
+
+  <div id="resultsContainer">
+    <div class="empty-state">
+      <div class="empty-state-title">Your deep research begins here.</div>
+      <div class="empty-state-sub">Oracle reads sources, extracts insights, and builds a research brief — not just a link list.</div>
+    </div>
+  </div>
+</div>
 
 <script>
-async function search(){
-  const q = document.getElementById('q').value;
-  const out = document.getElementById('out');
-  out.innerHTML = 'Searching...';
+let activeCategory = 'all';
 
-  try{
-    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://en.wikipedia.org/api/rest_v1/page/summary/'+q)}`);
-    const data = await res.json();
+document.querySelectorAll('.cat-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    activeCategory = pill.dataset.cat;
+  });
+});
 
-    out.innerHTML = `
-      <div class="result">
-        <h2>${data.title}</h2>
-        <p>${data.extract}</p>
-      </div>
-    `;
-  }catch(e){
-    out.innerHTML = 'Error fetching results';
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+function setStatus(state, text) {
+  document.getElementById('statusDot').className = 'status-dot' + (state ? ' '+state : '');
+  document.getElementById('statusText').textContent = text;
+}
+
+function setStep(n, state) {
+  const el = document.getElementById('step'+n);
+  if (!el) return;
+  el.className = 'step ' + state;
+  el.querySelector('.step-icon').textContent = state === 'done' ? '✓' : state === 'active' ? '▶' : '◎';
+}
+
+function showProgress() {
+  document.getElementById('progressSteps').classList.add('visible');
+  for(let i=1;i<=5;i++) setStep(i,'');
+}
+function hideProgress() {
+  document.getElementById('progressSteps').classList.remove('visible');
+}
+
+function showDebug(msg) {
+  const box = document.getElementById('debugBox');
+  box.textContent = msg;
+  box.classList.add('visible');
+}
+function hideDebug() {
+  document.getElementById('debugBox').classList.remove('visible');
+}
+
+function parseResults(rawText) {
+  let results = null;
+  // Try direct parse
+  try { const t = rawText.trim(); if(t.startsWith('[')) results = JSON.parse(t); } catch(e){}
+  // Find array
+  if (!Array.isArray(results)) {
+    const m = rawText.match(/\[[\s\S]*\]/);
+    if (m) { try { results = JSON.parse(m[0]); } catch(e){} }
   }
+  // Strip fences
+  if (!Array.isArray(results)) {
+    const stripped = rawText.replace(/```[\w]*\n?/g,'').trim();
+    const m = stripped.match(/\[[\s\S]*\]/);
+    if (m) { try { results = JSON.parse(m[0]); } catch(e){} }
+  }
+  return Array.isArray(results) ? results : null;
+}
+
+async function doSearch() {
+  const query = document.getElementById('searchInput').value.trim();
+  if (!query) return;
+
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true;
+  hideDebug();
+  showProgress();
+  document.getElementById('resultsContainer').innerHTML = '';
+  setStatus('searching', 'Deep researching…');
+
+  const fAcademic  = document.getElementById('fAcademic').checked;
+  const fNews      = document.getElementById('fNews').checked;
+  const fEncyclopedia = document.getElementById('fEncyclopedia').checked;
+  const fLongform  = document.getElementById('fLongform').checked;
+  const fReddit    = document.getElementById('fReddit').checked;
+  const fQuora     = document.getElementById('fQuora').checked;
+  const fSubstack  = document.getElementById('fSubstack').checked;
+  const fForums    = document.getElementById('fForums').checked;
+
+  const sourceList = [
+    fAcademic && 'academic papers, university research, JSTOR, Google Scholar, think tanks (Brookings, CFR, ORF, Carnegie)',
+    fNews && 'quality journalism: BBC, Guardian, NYT, Reuters, Al Jazeera, Foreign Affairs, The Atlantic, The Wire, The Hindu, Scroll, Haaretz, Foreign Policy',
+    fEncyclopedia && 'Wikipedia (detailed articles), Britannica, Stanford Encyclopedia of Philosophy',
+    fLongform && 'long-form essays: Aeon, Quillette, Noema, literary reviews, in-depth explainers, Jacobin, N+1',
+    fReddit && 'Reddit discussions and threads (reddit.com) — include specific subreddit threads with deep discussions',
+    fQuora && 'Quora answers — especially detailed expert answers',
+    fSubstack && 'Substack essays and newsletters',
+    fForums && '4chan archive threads (archived.moe, 4plebs), other forums like HackerNews, StackExchange, PhilosophyStackExchange'
+  ].filter(Boolean).join('; ');
+
+  const categoryHint = activeCategory !== 'all' ? `The user is researching specifically in the category: ${activeCategory}.` : '';
+
+  // PHASE 1: search + brief
+  setStep(1,'active');
+  setTimeout(()=>{ setStep(1,'done'); setStep(2,'active'); }, 2000);
+  setTimeout(()=>{ setStep(2,'done'); setStep(3,'active'); }, 5000);
+  setTimeout(()=>{ setStep(3,'done'); setStep(4,'active'); }, 9000);
+  setTimeout(()=>{ setStep(4,'done'); setStep(5,'active'); }, 13000);
+
+  const systemPrompt = `You are ORACLE, an elite deep research assistant. Your job is NOT to give surface-level summaries. You must produce genuinely deep, substantive research.
+
+When given a topic, you:
+1. Search the web multiple times with different angles to find the best sources
+2. For the brief: synthesize what is actually known, contested, significant — not a Wikipedia summary
+3. For sources: target specifically: ${sourceList}
+
+${categoryHint}
+
+You MUST return ONLY a raw JSON object. No explanation. No markdown. No backticks. Start with { and end with }.
+
+Return this exact structure:
+{
+  "brief": {
+    "title": "A sharp, specific research title for this topic (not generic)",
+    "overview": "3-4 paragraphs of genuinely deep synthesized knowledge about this topic. Cover: what it is, why it matters, what the key tensions/debates are, what most people get wrong or miss, historical context, current significance. Write as an expert analyst would. Do NOT be generic or surface-level.",
+    "keypoints": [
+      "A sharp, specific insight about this topic",
+      "Another non-obvious insight",
+      "A third insight that shows depth",
+      "A fourth insight",
+      "A fifth insight"
+    ]
+  },
+  "results": [
+    {
+      "title": "exact page title",
+      "url": "https://complete-real-url",
+      "source": "short source name",
+      "type": "academic|news|encyclopedia|longform|community|forum|general",
+      "summary": "3-4 sentences: what this specific source covers, what unique angle or depth it provides, why it is more valuable than a surface source",
+      "quality": number 60-100
+    }
+  ]
+}
+
+For results: return 15-20 items. Include a genuine mix including forum discussions if enabled. Every URL must be real. Summaries must be specific, not generic.
+For the brief: write as if briefing an intelligent person who already knows the basics. Go deeper.`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 8000,
+        system: systemPrompt,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{
+          role: "user",
+          content: `Deep research topic: "${query}"\n\nSearch the web thoroughly — use multiple searches with different angles. Then return the JSON object with a deep research brief and 15-20 curated sources. Raw JSON only, no markdown.`
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      showDebug(`API error ${response.status}: ${errText.slice(0,400)}`);
+      setStatus('error', `API error ${response.status}`);
+      hideProgress();
+      btn.disabled = false;
+      return;
+    }
+
+    const data = await response.json();
+
+    let rawText = '';
+    for (const block of (data.content || [])) {
+      if (block.type === 'text') rawText += block.text;
+    }
+
+    setStep(5,'done');
+
+    // Parse the outer object
+    let parsed = null;
+    try { const t = rawText.trim(); if(t.startsWith('{')) parsed = JSON.parse(t); } catch(e){}
+    if (!parsed) {
+      const m = rawText.match(/\{[\s\S]*\}/);
+      if (m) { try { parsed = JSON.parse(m[0]); } catch(e){} }
+    }
+    if (!parsed) {
+      const stripped = rawText.replace(/```[\w]*\n?/g,'').trim();
+      const m = stripped.match(/\{[\s\S]*\}/);
+      if (m) { try { parsed = JSON.parse(m[0]); } catch(e){} }
+    }
+
+    if (!parsed) {
+      showDebug(`Parse failed. Raw (first 600): ${rawText.slice(0,600)}`);
+      setStatus('error', 'Parse error — see debug below.');
+      hideProgress();
+      btn.disabled = false;
+      return;
+    }
+
+    hideProgress();
+    renderAll(parsed, query);
+    const count = (parsed.results || []).length;
+    setStatus('live', `Research brief + ${count} sources found for "${query}"`);
+
+  } catch(err) {
+    showDebug(`Error: ${err.message}`);
+    setStatus('error', 'Connection error. Try again.');
+    hideProgress();
+    document.getElementById('resultsContainer').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-title">Connection error.</div>
+        <div class="empty-state-sub">Check your internet and try again.</div>
+      </div>`;
+  }
+
+  btn.disabled = false;
+}
+
+function renderAll(parsed, query) {
+  const container = document.getElementById('resultsContainer');
+  const brief = parsed.brief || {};
+  const results = parsed.results || [];
+
+  const typeLabels = {academic:'Academic',news:'News',encyclopedia:'Reference',longform:'Long-form',community:'Community',forum:'Forum',general:'General'};
+
+  const briefHTML = brief.title ? `
+    <div class="research-brief">
+      <div class="brief-label">Research Brief</div>
+      <div class="brief-title">${brief.title}</div>
+      <div class="brief-body">${(brief.overview||'').split('\n').filter(p=>p.trim()).map(p=>`<p>${p}</p>`).join('')}</div>
+      ${brief.keypoints && brief.keypoints.length ? `
+        <div class="brief-keypoints">
+          ${brief.keypoints.map(k=>`<div class="keypoint"><span class="keypoint-bullet">→</span><span>${k}</span></div>`).join('')}
+        </div>` : ''}
+    </div>` : '';
+
+  const sourcesHTML = results.length ? `
+    <div class="sources-header">
+      <span>Curated Sources (${results.length})</span>
+      <span>Ranked by depth & relevance</span>
+    </div>
+    <div class="results-grid">
+      ${results.map((r,i)=>`
+        <div class="result-card" style="animation-delay:${i*0.04}s">
+          <div class="result-number">${String(i+1).padStart(2,'0')}</div>
+          <div class="result-body">
+            <div class="result-meta">
+              <span class="result-source">${r.source||'Source'}</span>
+              <span class="result-type type-${r.type||'general'}">${typeLabels[r.type]||'General'}</span>
+            </div>
+            <div class="result-title"><a href="${r.url||'#'}" target="_blank" rel="noopener">${r.title||'Untitled'}</a></div>
+            <div class="result-summary">${r.summary||''}</div>
+            <div class="result-quality">
+              <div class="quality-bar"><div class="quality-fill" style="width:${r.quality||70}%"></div></div>
+              <span class="quality-label">Depth ${r.quality||70}%</span>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>` : '';
+
+  container.innerHTML = briefHTML + sourcesHTML;
 }
 </script>
 </body>
